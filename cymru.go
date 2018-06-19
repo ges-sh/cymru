@@ -8,12 +8,9 @@ import (
 	"time"
 )
 
-const shortTimeForm = "2006-01-02"
-
-// TXT contains information about DNS TXT record
-type TXT struct {
+// IPInfo contains information about DNS IPInfo record
+type IPInfo struct {
 	AS        string
-	IP        net.IP
 	CIDR      *net.IPNet
 	Country   string
 	RIR       string
@@ -22,11 +19,12 @@ type TXT struct {
 
 const origin = "origin.asn.cymru.com"
 
-// Lookup returns TXT data of provided dns record
-func Lookup(addr string) (*TXT, error) {
+// LookupIP returns ip info. It accepts ip address in format "xxx.xxx.xxx.xxx"
+func LookupIP(addr string) (IPInfo, error) {
+	var ipInfo IPInfo
 	ip := net.ParseIP(addr).To4()
 	if ip == nil {
-		return nil, errors.New("not IPv4")
+		return ipInfo, errors.New("not IPv4")
 	}
 
 	reverseIP(ip)
@@ -35,36 +33,32 @@ func Lookup(addr string) (*TXT, error) {
 
 	info, err := net.LookupTXT(dns)
 	if err != nil {
-		return nil, err
+		return ipInfo, err
 	}
 	if len(info) < 1 {
-		return nil, errors.New("no dns info")
+		return ipInfo, errors.New("no dns info")
 	}
 
 	splitTXT := splitFuncs(info[0], "|", strings.TrimSpace)
 	if len(splitTXT) < 5 {
-		return nil, fmt.Errorf("invalid TXT format %v", splitTXT)
+		return ipInfo, fmt.Errorf("invalid TXT format %v", splitTXT)
 	}
 
-	ip, ipNet, err := net.ParseCIDR(splitTXT[1])
+	_, ipInfo.CIDR, err = net.ParseCIDR(splitTXT[1])
 	if err != nil {
-		return nil, err
+		return ipInfo, err
 	}
 
-	createdAt, err := time.Parse(shortTimeForm, splitTXT[4])
+	ipInfo.CreatedAt, err = time.Parse(time.RFC3339, splitTXT[4])
 	if err != nil {
-		return nil, err
-	}
-	txt := &TXT{
-		AS:        splitTXT[0],
-		IP:        ip,
-		CIDR:      ipNet,
-		Country:   splitTXT[2],
-		RIR:       splitTXT[3],
-		CreatedAt: createdAt,
+		return ipInfo, err
 	}
 
-	return txt, nil
+	ipInfo.AS = splitTXT[0]
+	ipInfo.Country = splitTXT[2]
+	ipInfo.RIR = splitTXT[4]
+
+	return ipInfo, nil
 }
 
 func reverseIP(ip net.IP) {
@@ -72,9 +66,9 @@ func reverseIP(ip net.IP) {
 	ip[1], ip[2] = ip[2], ip[1]
 }
 
-// ASNTXT contains TXT data gathered from ASN lookup
-type ASNTXT struct {
-	ASN       string
+// ASInfo contains data gathered from AS lookup
+type ASInfo struct {
+	AS        string
 	Country   string
 	RIR       string
 	CreatedAt time.Time
@@ -83,34 +77,34 @@ type ASNTXT struct {
 
 const asnOrigin = "asn.cymru.com"
 
-// LookupASN makes ASN lookup
-func LookupASN(as string) (*ASNTXT, error) {
+// LookupAS returns as info. It accepts as name in format "ASXXXXX"
+func LookupAS(as string) (ASInfo, error) {
+	var asInfo ASInfo
+
 	asn := as + "." + asnOrigin
 	info, err := net.LookupTXT(asn)
 	if err != nil {
-		return nil, err
+		return asInfo, err
 	}
 	if len(info) < 1 {
-		return nil, errors.New("no dns info")
+		return asInfo, errors.New("no dns info")
 	}
 	splitTXT := splitFuncs(info[0], "|", strings.TrimSpace)
 	if len(splitTXT) < 5 {
-		return nil, fmt.Errorf("invalid TXT format %v", splitTXT)
+		return asInfo, fmt.Errorf("invalid TXT format %v", splitTXT)
 	}
 
-	createdAt, err := time.Parse(shortTimeForm, splitTXT[3])
+	asInfo.CreatedAt, err = time.Parse(time.RFC3339, splitTXT[3])
 	if err != nil {
-		return nil, err
+		return asInfo, err
 	}
 
-	asntxt := &ASNTXT{
-		ASN:       splitTXT[0],
-		Country:   splitTXT[1],
-		RIR:       splitTXT[2],
-		CreatedAt: createdAt,
-		Provider:  splitTXT[4],
-	}
-	return asntxt, nil
+	asInfo.AS = splitTXT[0]
+	asInfo.Country = splitTXT[1]
+	asInfo.RIR = splitTXT[2]
+	asInfo.Provider = splitTXT[4]
+
+	return asInfo, nil
 }
 
 // splitFuncs allows to provide additional funcs fs for strings.Split,
