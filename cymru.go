@@ -15,6 +15,8 @@ type TXT struct {
 	AS        string
 	IP        net.IP
 	CIDR      *net.IPNet
+	Country   string
+	RIR       string
 	CreatedAt time.Time
 }
 
@@ -57,6 +59,8 @@ func Lookup(addr string) (*TXT, error) {
 		AS:        splitTXT[0],
 		IP:        ip,
 		CIDR:      ipNet,
+		Country:   splitTXT[2],
+		RIR:       splitTXT[3],
 		CreatedAt: createdAt,
 	}
 
