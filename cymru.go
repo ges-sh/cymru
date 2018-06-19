@@ -8,12 +8,14 @@ import (
 	"time"
 )
 
+const shortTimeForm = "2006-01-02"
+
 // IPInfo contains information about DNS IPInfo record
 type IPInfo struct {
 	AS        string
 	CIDR      *net.IPNet
 	Country   string
-	RIR       string
+	Register  string
 	CreatedAt time.Time
 }
 
@@ -39,7 +41,7 @@ func LookupIP(addr string) (IPInfo, error) {
 		return ipInfo, errors.New("no dns info")
 	}
 
-	splitTXT := splitFuncs(info[0], "|", strings.TrimSpace)
+	splitTXT := strings.Split(info[0], " | ")
 	if len(splitTXT) < 5 {
 		return ipInfo, fmt.Errorf("invalid TXT format %v", splitTXT)
 	}
@@ -49,14 +51,14 @@ func LookupIP(addr string) (IPInfo, error) {
 		return ipInfo, err
 	}
 
-	ipInfo.CreatedAt, err = time.Parse(time.RFC3339, splitTXT[4])
+	ipInfo.CreatedAt, err = time.Parse(shortTimeForm, splitTXT[4])
 	if err != nil {
 		return ipInfo, err
 	}
 
 	ipInfo.AS = splitTXT[0]
 	ipInfo.Country = splitTXT[2]
-	ipInfo.RIR = splitTXT[4]
+	ipInfo.Register = splitTXT[4]
 
 	return ipInfo, nil
 }
@@ -70,7 +72,7 @@ func reverseIP(ip net.IP) {
 type ASInfo struct {
 	AS        string
 	Country   string
-	RIR       string
+	Register  string
 	CreatedAt time.Time
 	Provider  string
 }
@@ -89,32 +91,20 @@ func LookupAS(as string) (ASInfo, error) {
 	if len(info) < 1 {
 		return asInfo, errors.New("no dns info")
 	}
-	splitTXT := splitFuncs(info[0], "|", strings.TrimSpace)
+	splitTXT := strings.Split(info[0], " | ")
 	if len(splitTXT) < 5 {
 		return asInfo, fmt.Errorf("invalid TXT format %v", splitTXT)
 	}
 
-	asInfo.CreatedAt, err = time.Parse(time.RFC3339, splitTXT[3])
+	asInfo.CreatedAt, err = time.Parse(shortTimeForm, splitTXT[3])
 	if err != nil {
 		return asInfo, err
 	}
 
 	asInfo.AS = splitTXT[0]
 	asInfo.Country = splitTXT[1]
-	asInfo.RIR = splitTXT[2]
+	asInfo.Register = splitTXT[2]
 	asInfo.Provider = splitTXT[4]
 
 	return asInfo, nil
-}
-
-// splitFuncs allows to provide additional funcs fs for strings.Split,
-// which are invoked for every element of splitted string
-func splitFuncs(s, sep string, fs ...func(string) string) []string {
-	split := strings.Split(s, sep)
-	for i := range split {
-		for _, v := range fs {
-			split[i] = v(split[i])
-		}
-	}
-	return split
 }
